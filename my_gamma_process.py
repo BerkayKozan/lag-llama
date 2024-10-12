@@ -29,8 +29,11 @@ class GammaProcessComponent():
         return self.state
 
     def step(self):
+        #print("self.k: ", self.k)
         new_gammas = np.random.gamma(self.k, 1 / self.lam, self.num_components)
+        #print(f"New gammas: {new_gammas}")
         self.state += new_gammas
+        #print(f"New states: {self.state}")
         return self.state
 
     def get_state(self):
@@ -66,34 +69,39 @@ class DeteriorationModel(GammaProcessComponent):
     def reset(self):
         self.t = 0
         self.a = np.random.lognormal(self.mu, self.sigma, self.num_components)  # There should be unique a for each component.
+        print(f"Initial a: {self.a}")
         return super().reset()
 
 def generate_unique_filename(base_name, extension):
     counter = 1
-    filename = f"{base_name}.{extension}"
+    base_path = f"datasets/deterioration/{base_name}"
+    filename = f"{base_path}.{extension}"
     while os.path.exists(filename):
-        filename = f"{base_name}_{counter}.{extension}"
+        filename = f"{base_path}_{counter}.{extension}"
         counter += 1
     return filename
+
 
 def normalize_and_save(df, base_name):
     # Normalize the data
     scaler = StandardScaler()
     numerical_columns = df.select_dtypes(include=['float32', 'float64']).columns
     df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
-    
+    means = scaler.mean_
+    std_devs = scaler.scale_
+    print(f"Means: {means}", f"Standard Deviations: {std_devs}")
     # Generate unique filenames for normalized data
     normalized_csv_file_name = generate_unique_filename(base_name + "_normalized", "csv")
     normalized_parquet_file_name = generate_unique_filename(base_name + "_normalized", "parquet")
 
     # Save the normalized data to CSV and Parquet files
     df.to_csv(normalized_csv_file_name, index=False)
-    df.to_parquet(normalized_parquet_file_name)
+    df.to_parquet(normalized_parquet_file_name, index=False)
     
     print(f"Normalized data saved to {normalized_csv_file_name} and {normalized_parquet_file_name}")
     return normalized_csv_file_name, normalized_parquet_file_name
 
-def generate_time_series(params, num_components=5):
+def generate_time_series(params, num_components=5, d_crit=25):
     # Extract parameters from the dictionary
     lam = params['lam']
     b = params['b']
@@ -101,28 +109,34 @@ def generate_time_series(params, num_components=5):
     sigma_squared = params['sigma_squared']
     mu = params['mu']
     initial_state = params['initial_state']
-    t = params['t']
 
-    # Number of steps for the time series
-    num_steps = np.ceil(t / delta_t).astype(int)
-    
     # Initialize the deterioration model
     hierarchical_gamma_process = DeteriorationModel(lam, b, delta_t, sigma_squared, mu, initial_state, num_components)
-    
-    # Reset and print initial state
-    hierarchical_gamma_process.reset()
-    
+    #hierarchical_gamma_process.reset()
+
     # Initialize a list to store the time series for each component
     hierarchical_gamma_series = [[] for _ in range(num_components)]
 
-    # Generate time series
-    for step in range(num_steps):
+    # First loop: Generate time series until each component reaches or exceeds d_crit
+    for _ in range(int(params['t'] / delta_t)): 
         current_states = hierarchical_gamma_process.step()
+        #print("current_states: ", current_states)
+        #print(current_states.shape)
         for i in range(num_components):
-            hierarchical_gamma_series[i].append(current_states[i])
+            if len(hierarchical_gamma_series[i]) == 0 or hierarchical_gamma_series[i][-1] < d_crit:
+                hierarchical_gamma_series[i].append(current_states[i])
+                if current_states[i] >= d_crit:
+                    print(f"Component {i} reached d_crit with value {current_states[i]}")
+                    # Stop further generation for this component after recording the first value that exceeds d_crit
+                    continue
 
-    # Convert lists to numpy arrays
-    hierarchical_gamma_series = [np.array(component_states) for component_states in hierarchical_gamma_series]
+    # Second loop: Find the maximum length of the generated series
+    max_length = max(len(series) for series in hierarchical_gamma_series)
+
+    # Pad the series with NaN to match the maximum length
+    for i in range(num_components):
+        if len(hierarchical_gamma_series[i]) < max_length:
+            hierarchical_gamma_series[i] += [np.nan] * (max_length - len(hierarchical_gamma_series[i]))
 
     # Create a DataFrame for each component's states (wide format)
     data_wide = {}
@@ -130,36 +144,40 @@ def generate_time_series(params, num_components=5):
         data_wide[f"Component_{i}"] = hierarchical_gamma_series[i]
 
     df_wide = pd.DataFrame(data_wide)
-    
     # Add a timestamp index to the DataFrame
-    time_index = pd.date_range(start='2021-01-01', periods=num_steps, freq='H')
+    time_index = pd.date_range(start='2021-01-01', periods=max_length, freq=f'{delta_t}H')
     df_wide.index = time_index
 
+
     # Generate unique filenames based on parameters
-    base_name_wide = f"ts_wide_{delta_t}_{t}_{num_components}"
+    base_name_wide = f"ts_wide_{delta_t}_{params['t']}_{num_components}"
     file_name_wide = generate_unique_filename(base_name_wide, "parquet")
-    base_name_long = f"ts_long_{delta_t}_{t}_{num_components}"
+    base_name_long = f"ts_long_{delta_t}_{params['t']}_{num_components}"
     file_name_long = generate_unique_filename(base_name_long, "parquet")
 
     # Save the wide DataFrame to a Parquet file
     df_wide.to_parquet(file_name_wide)
 
     # Print the wide DataFrame
-    print(df_wide.head(20))
+    print("Wide DataFrame before reshaping:")
+    #print(df_wide.head(20))
 
-    # Reshape the DataFrame to the long format
-    df_long = df_wide.reset_index().melt(id_vars='index', var_name='item_id', value_name='target')
-    df_long.rename(columns={'index': 'timestamp'}, inplace=True)
-    
+    df_long = df_wide.reset_index().melt(id_vars=['index'], var_name='item_id', value_name='target')
+    df_long.set_index('index', inplace=True)
+    df_long.index.name = None
+
+    print("Long DataFrame after reshaping:")
+    #print(df_long.head(20))
+
     # Save the long DataFrame to a Parquet file
     df_long.to_parquet(file_name_long)
-    
+
     # Print the long DataFrame
-    print(df_long.head(20))
+    #print(df_long.head(20))
 
     # Normalize and save the wide and long data
-    normalize_and_save(df_wide, base_name_wide)
-    normalize_and_save(df_long, base_name_long)
+    #normalize_and_save(df_wide, base_name_wide)
+    #normalize_and_save(df_long, base_name_long)
 
     return file_name_long, file_name_wide
 
@@ -171,11 +189,11 @@ params = {
     'sigma_squared': 0.001,  # Standard deviation of the lognormal distribution
     'mu': 0.002,  # Mean of the lognormal distribution
     'initial_state': 0.0,  # Initial state
-    't': 20  # Total time
+    't': 100  # Total time
 }
 
 # Generate the time series and save to Parquet files
-file_name_long, file_name_wide = generate_time_series(params, num_components=10)
+file_name_long, file_name_wide = generate_time_series(params, num_components=1, d_crit=25)
 
 print(f"Data saved to {file_name_long} and {file_name_wide}")
 
@@ -187,4 +205,3 @@ def convert_parquet_to_csv(parquet_file, csv_file):
 # Example usage to convert files
 convert_parquet_to_csv(file_name_long, file_name_long.replace(".parquet", ".csv"))
 convert_parquet_to_csv(file_name_wide, file_name_wide.replace(".parquet", ".csv"))
-
