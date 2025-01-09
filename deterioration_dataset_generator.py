@@ -1,4 +1,6 @@
+import datetime
 import os
+import random
 import numpy as np
 import pandas as pd
 from scipy.stats import gamma
@@ -82,25 +84,6 @@ def generate_unique_filename(base_name, extension):
     return filename
 
 
-def normalize_and_save(df, base_name):
-    # Normalize the data
-    scaler = StandardScaler()
-    numerical_columns = df.select_dtypes(include=['float32', 'float64']).columns
-    df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
-    means = scaler.mean_
-    std_devs = scaler.scale_
-    print(f"Means: {means}", f"Standard Deviations: {std_devs}")
-    # Generate unique filenames for normalized data
-    normalized_csv_file_name = generate_unique_filename(base_name + "_normalized", "csv")
-    normalized_parquet_file_name = generate_unique_filename(base_name + "_normalized", "parquet")
-
-    # Save the normalized data to CSV and Parquet files
-    df.to_csv(normalized_csv_file_name, index=False)
-    df.to_parquet(normalized_parquet_file_name, index=False)
-    
-    print(f"Normalized data saved to {normalized_csv_file_name} and {normalized_parquet_file_name}")
-    return normalized_csv_file_name, normalized_parquet_file_name
-
 def generate_time_series(params, num_components=5, d_crit=25):
     # Extract parameters from the dictionary
     lam = params['lam']
@@ -133,10 +116,11 @@ def generate_time_series(params, num_components=5, d_crit=25):
     # Second loop: Find the maximum length of the generated series
     max_length = max(len(series) for series in hierarchical_gamma_series)
 
-    # Pad the series with NaN to match the maximum length
+    # Pad the series with NaN at the beginning to match the maximum length
     for i in range(num_components):
         if len(hierarchical_gamma_series[i]) < max_length:
-            hierarchical_gamma_series[i] += [np.nan] * (max_length - len(hierarchical_gamma_series[i]))
+            pad_length = max_length - len(hierarchical_gamma_series[i])
+            hierarchical_gamma_series[i] = [np.nan] * pad_length + hierarchical_gamma_series[i]
 
     # Create a DataFrame for each component's states (wide format)
     data_wide = {}
@@ -150,9 +134,9 @@ def generate_time_series(params, num_components=5, d_crit=25):
 
 
     # Generate unique filenames based on parameters
-    base_name_wide = f"ts_wide_{delta_t}_{params['t']}_{num_components}"
+    base_name_wide = f"ts_wide_{params['lam']}_{params['t']}_{num_components}"
     file_name_wide = generate_unique_filename(base_name_wide, "parquet")
-    base_name_long = f"ts_long_{delta_t}_{params['t']}_{num_components}"
+    base_name_long = f"ts_long_{params['lam']}_{params['t']}_{num_components}"
     file_name_long = generate_unique_filename(base_name_long, "parquet")
 
     # Save the wide DataFrame to a Parquet file
@@ -172,18 +156,12 @@ def generate_time_series(params, num_components=5, d_crit=25):
     # Save the long DataFrame to a Parquet file
     df_long.to_parquet(file_name_long)
 
-    # Print the long DataFrame
-    #print(df_long.head(20))
-
-    # Normalize and save the wide and long data
-    #normalize_and_save(df_wide, base_name_wide)
-    #normalize_and_save(df_long, base_name_long)
 
     return file_name_long, file_name_wide
 
 # Define parameters as a dictionary
 params = {
-    'lam': 10.0,  # Scale parameter
+    'lam': 1.0,  # Scale parameter
     'b': 2,
     'delta_t': 0.1,
     'sigma_squared': 0.001,  # Standard deviation of the lognormal distribution
@@ -193,7 +171,7 @@ params = {
 }
 
 # Generate the time series and save to Parquet files
-file_name_long, file_name_wide = generate_time_series(params, num_components=1, d_crit=25)
+file_name_long, file_name_wide = generate_time_series(params, num_components=10000, d_crit=25)
 
 print(f"Data saved to {file_name_long} and {file_name_wide}")
 

@@ -5,16 +5,20 @@ from tqdm.autonotebook import tqdm
 from gluonts.evaluation import Evaluator, make_evaluation_predictions
 from gluonts.model.forecast import SampleForecast
 import wandb
+import joblib
 
 class ModelEvaluator:
     def __init__(self, scaler):
         self.scaler = scaler
         self.evaluator = Evaluator()
     
-    def evaluate(self, dataset, predictor):
-        forecast_it, ts_it = make_evaluation_predictions(dataset=dataset, predictor=predictor, num_samples=100)
+    def evaluate(self, dataset, predictor, enable_normalize, num_samples=10):
+        forecast_it, ts_it = make_evaluation_predictions(dataset=dataset, predictor=predictor, num_samples=num_samples)
         forecasts = list(tqdm(forecast_it, total=len(dataset), desc="Forecasting"))
         tss = list(tqdm(ts_it, total=len(dataset), desc="Ground truth"))
+        if not enable_normalize:
+            agg_metrics, ts_metrics = self.evaluator(iter(tss), iter(forecasts))
+            return forecasts, tss, agg_metrics, ts_metrics
         denormalized_forecasts = self.denormalize_forecasts(forecasts)
         denormalized_tss = self.denormalize_tss(tss)
         agg_metrics, ts_metrics = self.evaluator(iter(denormalized_tss), iter(denormalized_forecasts))

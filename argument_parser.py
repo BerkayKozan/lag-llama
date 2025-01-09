@@ -1,5 +1,5 @@
 import argparse
-from constants import ARGUMENTS, DEFAULT_ARGS
+from constants import ARGUMENTS
 
 class ArgumentParser:
     def __init__(self):
@@ -10,9 +10,6 @@ class ArgumentParser:
         for arg in ARGUMENTS:
             flags = arg.pop("flags")
             arg_name = flags[-1].lstrip("-").replace("-", "_")
-            # Use default from DEFAULT_ARGS if it exists
-            if arg_name in DEFAULT_ARGS:
-                arg['default'] = DEFAULT_ARGS[arg_name]
             parser.add_argument(*flags, **arg)
             
         return parser.parse_args()

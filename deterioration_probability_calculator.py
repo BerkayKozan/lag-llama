@@ -13,33 +13,38 @@ class DeteriorationProbabilityCalculator:
         self.frequency = frequency
         self.max_deterioration = max_deterioration
         self.deterioration_probabilities = []
-
+        
     def calculate_deterioration_probability(self):
         """
-        Calculates the probability of deterioration over time based on forecast samples.
+        Calculates the probability of deterioration over time for each component based on forecast samples.
+        For each component, determines the first time step where the probability exceeds the critical percentage.
+
+        :param critical_percentage: The percentage threshold to decide when to repair.
+        :return: A dictionary mapping each component to its repair step and probability timeline.
         """
-        # Get the number of samples and forecast length from the first forecast's samples
-        num_samples, forecast_length = self.forecasts[0].samples.shape
+        # Dictionary to store results for each component
+        component_results = {}
 
-        print(f"Number of samples: {num_samples}")
-        print(f"Forecast length: {forecast_length}")
-        print(f"Forecasts: {self.forecasts}")
-        # Iterate over each timestep with the specified frequency
-        for t in range(0, forecast_length, self.frequency):
-            # For each forecast, count samples exceeding max_deterioration at this timestep
-            count_deteriorated = sum(
-                (forecast.samples[:, t] > self.max_deterioration).sum() for forecast in self.forecasts
-            )
-            print(f"Count deteriorated at timestep {t}: {count_deteriorated}")
-            # Calculate probability as a percentage
-            deterioration_probability = (count_deteriorated / num_samples)
-            self.deterioration_probabilities.append((t, deterioration_probability))
+        for comp_idx, forecast in enumerate(self.forecasts):  # Iterate over components
+            num_samples, forecast_length = forecast.samples.shape
+            print("num_samples: ", num_samples)
+            print("forecast_length: ", forecast_length)
+            probabilities = []  # To store probabilities at each time step
+            repair_step = None  # To store the first step exceeding critical threshold
 
-            # Stop if deterioration reaches 100%
-            if deterioration_probability >= 1:
-                break
+            for t in range(0, forecast_length, self.frequency):
+                # For each timestep, count how many samples exceed max_deterioration
+                count_deteriorated = (forecast.samples > self.max_deterioration).any(axis=1).sum()
 
-        return self.deterioration_probabilities
+                # Calculate probability as a percentage
+                deterioration_probability = (count_deteriorated / num_samples)
+                probabilities.append((t, deterioration_probability))
+
+            # Store the results for this component
+            component_results[comp_idx] = {
+                "probabilities": probabilities,
+            }
+        return component_results
 
     def get_results(self):
         """
@@ -62,7 +67,7 @@ class DeteriorationProbabilityCalculator:
                 try:
                     T_F = np.where(sample > self.max_deterioration)[0][0]  # First time it exceeds threshold
                 except IndexError:
-                    T_F = len(sample)  # If never exceeds, set to end of forecast
+                    T_F = None  # If never exceeds, set to end of forecast
                 forecast_failure_times.append(T_F)
             failure_times.append(forecast_failure_times)
         return failure_times

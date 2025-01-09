@@ -3,6 +3,7 @@ from sklearn.preprocessing import StandardScaler
 
 class DataLoader:
     def __init__(self, file_path, scaler):
+        self.file_path = file_path
         self.df = pd.read_parquet(file_path)
         self.scaler = scaler
     
@@ -25,4 +26,20 @@ class DataLoader:
         train_df.loc[:, numerical_columns] = self.scaler.fit_transform(train_df[numerical_columns])
         val_df.loc[:, numerical_columns] = self.scaler.transform(val_df[numerical_columns])
         test_df.loc[:, numerical_columns] = self.scaler.transform(test_df[numerical_columns])
-        return train_df, val_df, test_df
+        return train_df, val_df, test_df, self.scaler
+
+    def normalize_with_scaler(self, df, scaler):
+        """
+        Normalize a dataframe using a preloaded scaler.
+        """
+        numerical_columns = df.select_dtypes(include=['float32', 'float64']).columns
+        df.loc[:, numerical_columns] = scaler.transform(df[numerical_columns])
+        return df
+    
+    # Function to reorder targets
+    def reorder_targets(self, group):
+        # Separate NaNs and non-NaNs
+        non_nan = group.dropna()
+        nan = group[group.isna()]
+        # Concatenate non-NaNs followed by NaNs
+        return pd.concat([non_nan, nan])
