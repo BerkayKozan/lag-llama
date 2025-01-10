@@ -6,7 +6,16 @@ from callbacks_handler import CallbacksHandler
 from lag_llama_trainer import LagLlamaTrainer
 from model_evaluator import ModelEvaluator
 from gluonts.dataset.pandas import PandasDataset
-from constants import ESTIMATOR_PARAMS, FORECAST_COST_PARAMS
+from constants import (
+    DEFAULT_DATA_PATH,
+    UNNORMALIZED_BEST_CHECKPOINT_PATH,
+    ZERO_SHOT_CKPT_PATH,
+    NORMALIZED_BEST_CKPT_PATH,
+    FORECAST_COST_PARAMS,
+    EVALUATION_PARAMS,
+    PREVENTIVE_COST_DEFAULT,
+    ESTIMATOR_PARAMS
+)
 from deterioration_probability_calculator import DeteriorationProbabilityCalculator
 import wandb
 import pickle
@@ -26,7 +35,7 @@ import numpy as np
 
 class Main:
     def __init__(self):
-        self.data_path = "datasets/deterioration/ts_long_1.0_100_10000_3.parquet"
+        self.data_path = DEFAULT_DATA_PATH
         self.args = ArgumentParser().args
         self.scaler = StandardScaler()
         self.data_loader = DataLoader(self.data_path, self.scaler)
@@ -40,7 +49,6 @@ class Main:
         
     def incremental_evaluation(self, predictor, evaluator, frequency):
         
-        # Define cp_cc_ratios from ~0.01 to ~0.99 (not including 1.0)
         cp_cc_ratios = np.logspace(-2, np.log10(0.99), 21)  # 21 values between 0.01 and ~0.99
 
         test_data = self.dataset['test_df']
@@ -92,7 +100,7 @@ class Main:
             self.deterioration_calculator = DeteriorationProbabilityCalculator(
                 forecasts,
                 frequency,
-                max_deterioration=25
+                max_deterioration=FORECAST_COST_PARAMS["max_deterioration_value"]
             )
             deterioration_probabilities = self.deterioration_calculator.calculate_deterioration_probability()
             print(f"Step {step} | Deterioration probabilities: {deterioration_probabilities}")
@@ -120,7 +128,7 @@ class Main:
 
         # After completing all steps, we have a dictionary of time_to_repair lists for each scenario.
         # Compute M_hat for each scenario
-        cp = 100
+        cp = PREVENTIVE_COST_DEFAULT
         M_hat_values = []
 
         for ratio in cp_cc_ratios:
@@ -129,7 +137,7 @@ class Main:
             forecast_estimator = forecast_cost_estimator.ForecastCostEstimator(
                 tss=tss,
                 frequency=FORECAST_COST_PARAMS["frequency"],
-                max_deterioration=25,
+                max_deterioration=FORECAST_COST_PARAMS["max_deterioration_value"],
                 preventive_cost=cp,
                 corrective_cost=cc,
                 T_R_list=T_R_list
@@ -244,23 +252,20 @@ class Main:
 
     def evaluate(self, enable_normalize):
         # Load the trained predictor
-        ckpt_path = "models/best-epoch=65-val_loss=0.39.ckpt"
+        ckpt_path = UNNORMALIZED_BEST_CHECKPOINT_PATH
         non_neg_pred_samples = True
         if enable_normalize:
-            if main.args.rope:
-                ckpt_path = "models/best-epoch=88-val_loss=-1.59_ROPE.ckpt"
-            else:
-                ckpt_path = "models/best-epoch=76-val_loss=-1.59.ckpt"
+            ckpt_path = NORMALIZED_BEST_CKPT_PATH
             non_neg_pred_samples = False
         if self.args.zero_shot:
-            ckpt_path = "models/lag-llama.ckpt"
+            ckpt_path = ZERO_SHOT_CKPT_PATH
         ckpt = torch.load(ckpt_path, map_location="cpu")
         estimator_args = ckpt["hyper_parameters"]["model_kwargs"]
         estimator_args["ckpt_path"] = ckpt_path
         estimator_args["device"] = torch.device("cpu")
         estimator_args["prediction_length"] = FORECAST_COST_PARAMS["frequency"]
         trainer = LagLlamaTrainer(estimator_args)
-        self.predictor = trainer.get_lag_llama_predictions(ckpt_path=estimator_args["ckpt_path"], prediction_length=estimator_args["prediction_length"], context_length=128, num_samples=100, device=estimator_args["device"], batch_size=ESTIMATOR_PARAMS["batch_size"], nonnegative_pred_samples=non_neg_pred_samples, use_rope_scaling=self.args.rope)
+        self.predictor = trainer.get_lag_llama_predictions(ckpt_path=estimator_args["ckpt_path"], prediction_length=estimator_args["prediction_length"], context_length=EVALUATION_PARAMS["context_length"], num_samples=EVALUATION_PARAMS["num_samples"], device=estimator_args["device"], batch_size=ESTIMATOR_PARAMS["batch_size"], nonnegative_pred_samples=non_neg_pred_samples, use_rope_scaling=self.args.rope_scaling)
         
         wandb.init(project=self.args.wandb_project)
         evaluator = ModelEvaluator(scaler=self.scaler)
@@ -338,14 +343,13 @@ if __name__ == "__main__":
 
     main = Main()
     main.args.zero_shot = main.args.zero_shot == "True"
-    main.args.rope = main.args.rope == "True"
+    main.args.rope_scaling = main.args.rope_scaling == "True"
     main.args.normalize = main.args.normalize == "True"
     enable_normalize = main.args.normalize
 
     print(f"Enable normalize: {enable_normalize}")
     print(f"Zero shot learning: {main.args.zero_shot}")
-    print(f"Rope scaling: {main.args.rope}")
-    print(os.getcwd())
+    print(f"Rope scaling: {main.args.rope_scaling}")
     if main.args.mode == "train":
         main.execute_train(enable_normalize)
     elif main.args.mode == "evaluate":

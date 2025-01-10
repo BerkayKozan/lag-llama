@@ -103,8 +103,7 @@ def generate_time_series(params, num_components=5, d_crit=25):
     # First loop: Generate time series until each component reaches or exceeds d_crit
     for _ in range(int(params['t'] / delta_t)): 
         current_states = hierarchical_gamma_process.step()
-        #print("current_states: ", current_states)
-        #print(current_states.shape)
+
         for i in range(num_components):
             if len(hierarchical_gamma_series[i]) == 0 or hierarchical_gamma_series[i][-1] < d_crit:
                 hierarchical_gamma_series[i].append(current_states[i])
@@ -142,44 +141,37 @@ def generate_time_series(params, num_components=5, d_crit=25):
     # Save the wide DataFrame to a Parquet file
     df_wide.to_parquet(file_name_wide)
 
-    # Print the wide DataFrame
-    print("Wide DataFrame before reshaping:")
-    #print(df_wide.head(20))
-
     df_long = df_wide.reset_index().melt(id_vars=['index'], var_name='item_id', value_name='target')
     df_long.set_index('index', inplace=True)
     df_long.index.name = None
 
-    print("Long DataFrame after reshaping:")
-    #print(df_long.head(20))
-
     # Save the long DataFrame to a Parquet file
     df_long.to_parquet(file_name_long)
 
-
     return file_name_long, file_name_wide
 
-# Define parameters as a dictionary
-params = {
-    'lam': 1.0,  # Scale parameter
-    'b': 2,
-    'delta_t': 0.1,
-    'sigma_squared': 0.001,  # Standard deviation of the lognormal distribution
-    'mu': 0.002,  # Mean of the lognormal distribution
-    'initial_state': 0.0,  # Initial state
-    't': 100  # Total time
-}
+if __name__ == "__main__":
+    # Define parameters as a dictionary
+    params = {
+        'lam': 1.0,  # Scale parameter
+        'b': 2,
+        'delta_t': 0.1,
+        'sigma_squared': 0.001,  # Standard deviation of the lognormal distribution
+        'mu': 0.002,  # Mean of the lognormal distribution
+        'initial_state': 0.0,  # Initial state
+        't': 100  # Total time
+    }
 
-# Generate the time series and save to Parquet files
-file_name_long, file_name_wide = generate_time_series(params, num_components=10000, d_crit=25)
+    # Generate the time series and save to Parquet files
+    file_name_long, file_name_wide = generate_time_series(params, num_components=10000, d_crit=25)
 
-print(f"Data saved to {file_name_long} and {file_name_wide}")
+    print(f"Data saved to {file_name_long} and {file_name_wide}")
 
-# Function to convert Parquet to CSV
-def convert_parquet_to_csv(parquet_file, csv_file):
-    df = pd.read_parquet(parquet_file)
-    df.to_csv(csv_file, index=False)
+    # Function to convert Parquet to CSV
+    def convert_parquet_to_csv(parquet_file, csv_file):
+        df = pd.read_parquet(parquet_file)
+        df.to_csv(csv_file, index=False)
 
-# Example usage to convert files
-convert_parquet_to_csv(file_name_long, file_name_long.replace(".parquet", ".csv"))
-convert_parquet_to_csv(file_name_wide, file_name_wide.replace(".parquet", ".csv"))
+    # Example usage to convert files
+    convert_parquet_to_csv(file_name_long, file_name_long.replace(".parquet", ".csv"))
+    convert_parquet_to_csv(file_name_wide, file_name_wide.replace(".parquet", ".csv"))

@@ -35,11 +35,3 @@ class DataLoader:
         numerical_columns = df.select_dtypes(include=['float32', 'float64']).columns
         df.loc[:, numerical_columns] = scaler.transform(df[numerical_columns])
         return df
-    
-    # Function to reorder targets
-    def reorder_targets(self, group):
-        # Separate NaNs and non-NaNs
-        non_nan = group.dropna()
-        nan = group[group.isna()]
-        # Concatenate non-NaNs followed by NaNs
-        return pd.concat([non_nan, nan])

@@ -6,12 +6,12 @@ ARGUMENTS = [
     {
         "flags": ["-e", "--experiment_name"],
         "type": str,
-        "default": "lag-llama-evaluation_rope_long_cl",
+        "default": "lag-llama-evaluation",
         "help": "Name of the experiment"
     },
     
     {
-        "flags": ["-r", "--rope"],
+        "flags": ["-r", "--rope_scaling"],
         "type": str,
         "default": "True",
         "help": "Enable Rope Scaling"
@@ -122,10 +122,30 @@ SWEEP_CONFIG = {
     }
 }
 
+# Directories and files
+DATASETS_DIR = "datasets/deterioration"
+DEFAULT_DATA_PATH = f"{DATASETS_DIR}/ts_long_1.0_100_10000_3.parquet"
+
+MODELS_DIR = "models"
+UNNORMALIZED_BEST_CHECKPOINT_PATH = f"{MODELS_DIR}/best-epoch=65-val_loss=0.39.ckpt"
+ZERO_SHOT_CKPT_PATH = f"{MODELS_DIR}/lag-llama.ckpt"
+NORMALIZED_BEST_CKPT_PATH = f"{MODELS_DIR}/best-epoch=90-val_loss=-1.58.ckpt"
+
+SCALER_DIR = "scaler"
+
+
 FORECAST_COST_PARAMS = {
     "max_deterioration_value": 25,
     "frequency": 5,
 }
+
+EVALUATION_PARAMS = {
+    "context_length": 128,
+    "num_samples": 100,
+}
+
+# Example cost settings
+PREVENTIVE_COST_DEFAULT = 100
 
 # Default values for the estimator parameters
 ESTIMATOR_PARAMS = {

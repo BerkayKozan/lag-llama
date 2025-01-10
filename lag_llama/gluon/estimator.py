@@ -488,3 +488,8 @@ class LagLlamaEstimator(PyTorchLightningEstimator):
                 prediction_length=self.prediction_length,
                 device="cuda" if torch.cuda.is_available() else "cpu",
             )
+    
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        # Return the optimizer directly, and you can add a scheduler if needed
+        return optimizer
