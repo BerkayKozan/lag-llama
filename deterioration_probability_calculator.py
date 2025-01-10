@@ -27,8 +27,6 @@ class DeteriorationProbabilityCalculator:
 
         for comp_idx, forecast in enumerate(self.forecasts):  # Iterate over components
             num_samples, forecast_length = forecast.samples.shape
-            print("num_samples: ", num_samples)
-            print("forecast_length: ", forecast_length)
             probabilities = []  # To store probabilities at each time step
             repair_step = None  # To store the first step exceeding critical threshold
 
