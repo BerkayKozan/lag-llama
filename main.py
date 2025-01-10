@@ -88,7 +88,7 @@ class Main:
             )
 
             # Use the predictor to forecast
-            forecasts, tss, agg_metrics, ts_metrics = evaluator.evaluate(
+            forecasts, tss, agg_metrics, _ = evaluator.evaluate(
                 test_dataset,
                 self.predictor,
                 self.args.normalize,
@@ -327,8 +327,6 @@ class Main:
             test_df = self.data_loader.normalize_with_scaler(test_df, scaler)
 
         non_nan = test_df.dropna()
-        nan = test_df[test_df.isna()]
-        # Concatenate non-NaNs followed by NaNs
         test_df = non_nan
         
         dataset = {
