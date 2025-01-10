@@ -147,6 +147,8 @@ EVALUATION_PARAMS = {
 # Example cost settings
 PREVENTIVE_COST_DEFAULT = 100
 
+MAIN_DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
 # Default values for the estimator parameters
 ESTIMATOR_PARAMS = {
     "ckpt_path": "models/lag-llama.ckpt",

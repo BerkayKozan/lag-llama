@@ -13,6 +13,7 @@ from constants import (
     NORMALIZED_BEST_CKPT_PATH,
     FORECAST_COST_PARAMS,
     EVALUATION_PARAMS,
+    MAIN_DEVICE,
     PREVENTIVE_COST_DEFAULT,
     ESTIMATOR_PARAMS
 )
@@ -259,10 +260,10 @@ class Main:
             non_neg_pred_samples = False
         if self.args.zero_shot:
             ckpt_path = ZERO_SHOT_CKPT_PATH
-        ckpt = torch.load(ckpt_path, map_location="cpu")
+        ckpt = torch.load(ckpt_path, map_location=MAIN_DEVICE)
         estimator_args = ckpt["hyper_parameters"]["model_kwargs"]
         estimator_args["ckpt_path"] = ckpt_path
-        estimator_args["device"] = torch.device("cpu")
+        estimator_args["device"] = torch.device(MAIN_DEVICE)
         estimator_args["prediction_length"] = FORECAST_COST_PARAMS["frequency"]
         trainer = LagLlamaTrainer(estimator_args)
         self.predictor = trainer.get_lag_llama_predictions(ckpt_path=estimator_args["ckpt_path"], prediction_length=estimator_args["prediction_length"], context_length=EVALUATION_PARAMS["context_length"], num_samples=EVALUATION_PARAMS["num_samples"], device=estimator_args["device"], batch_size=ESTIMATOR_PARAMS["batch_size"], nonnegative_pred_samples=non_neg_pred_samples, use_rope_scaling=self.args.rope_scaling)
@@ -346,7 +347,6 @@ if __name__ == "__main__":
     main.args.rope_scaling = main.args.rope_scaling == "True"
     main.args.normalize = main.args.normalize == "True"
     enable_normalize = main.args.normalize
-
     print(f"Enable normalize: {enable_normalize}")
     print(f"Zero shot learning: {main.args.zero_shot}")
     print(f"Rope scaling: {main.args.rope_scaling}")
