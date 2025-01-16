@@ -122,7 +122,28 @@ datasets/deterioration/
       - By default it is enabled. This option lets us save time, when validation loss does not decrease in several epochs.
 9. **PdM-Specific Metric**:
       - We incorporate a cost-based metric to repair times for each component, determined based on the forecasts from our model. See our code in forecast_cost_estimator.py for details.
-   
+
+## Weights & Biases (WandB) Logging
+
+This project uses [Weights & Biases](https://wandb.ai/site) (WandB) for experiment tracking, plotting, and monitoring both training and evaluation.  
+
+1. **Sign Up or Log In**  
+   - If you don’t already have a WandB account, [sign up here](https://wandb.ai/site). Otherwise, log in to your existing account.
+
+2. **Log In Locally**  
+   - In your terminal/console, run:
+     ```bash
+     wandb login
+     ```
+   - Then paste your WandB API key from your [WandB account settings](https://wandb.ai/authorize) when prompted.
+
+3. **Running the Code**  
+   - Once logged in, when you train or evaluate (`python main.py -m train` or `python main.py -m evaluate`), metrics and plots will be automatically logged to your WandB workspace. You can visit your project page (e.g., `https://wandb.ai/<user_or_team>/<project>`) to see runs, charts, and model checkpoints.
+
+4. **Adjusting Run Times**  
+   - If you need to change how long training or evaluation runs (e.g., number of epochs, steps), edit the relevant parameters in `constants.py` or command-line args (if supported by your script). The changes will reflect in your WandB logs as well. You should also define in code, how many runs you want in your WandB Sweep (Applies only for training).
+
+By integrating WandB, you can conveniently visualize metrics, compare runs, and share results with your team in real time.
 ____
 ## Back to Original Lag Llama Repo:
 
