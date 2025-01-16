@@ -13,6 +13,119 @@ Lag-Llama is the <b>first open-source foundation model for time series forecasti
 [[Video](https://www.youtube.com/watch?v=Mf2FOzDPxck)]
 ____
 
+## Forked Repo Notes
+
+This repository is a **fork** of the original Lag-Llama. We have **extended** it to research **predictive maintenance** (PdM) scenarios. Our code and instructions focus on how to train and evaluate Lag-Llama with different data preprocessing choices (normalization), zero-shot modes, and RoPE scaling.
+
+### Abstract (Our Paper)
+
+> Modern engineering systems experience progressive deterioration due to wear and varying operating conditions, necessitating robust strategies for timely maintenance interventions. Predictive Maintenance (PdM) stands out among traditional approaches by leveraging Remaining Useful Life (RUL) estimations to schedule repairs only when genuinely necessary. In this work, we simulate real-life degradation by constructing a hierarchical gamma-process framework that generates univariate time-series trajectories. These synthetic data reflect realistic deterioration patterns, providing a controlled environment for evaluating predictive maintenance approaches. We then explore both statistical and deep-learning time-series forecasting methods, ultimately focusing on Lag-Llama—a foundation-model-based architecture adapted for univariate forecasting tasks.
+> Lag-Llama’s extensive pretraining allows for strong generalization, while fine-tuning refines its ability to model complex deterioration patterns. To evaluate how effectively such forecasts translate into cost-saving maintenance decisions, we adopt a cost-centric metric that captures the economic impact of early versus late repairs. We systematically compare zero-shot and fine-tuned settings, the effect of RoPE (Rotary Position Embedding) scaling, and the role of normalized versus unnormalized data.
+> Our results demonstrate that, under the right conditions, Lag-Llama not only produces accurate forecasts but also achieves favorable scores on our cost-based metric, reflecting well-timed maintenance actions. These findings offer valuable insights into how PdM strategies can be optimized by combining foundation-model capabilities with a rigorous, cost-sensitive evaluation framework.
+
+---
+
+## Repository Structure and How to Use This Fork
+
+1. **`main.py`**  
+   - Primary entry point to **train** or **evaluate** the model in our PdM scenario.
+   - Key command-line arguments:
+     - **`-m` / `--mode`** *(Required)*: `train` or `evaluate`.
+     - **`-n` / `--normalize`** *(Default: `True`)*: Whether to normalize data.
+     - **`-r` / `--rope_scaling`** *(Default: `False`)*: Enable RoPE scaling.
+     - **`-z` / `--zero_shot`** *(Default: `False`)*: Zero-shot mode (no model finetuning).
+   - **Example usage**:
+     ```bash
+     # Train with normalization (default)
+     python main.py -m train
+
+     # Evaluate with normalization (default)
+     python main.py -m evaluate
+
+     # Train with rope scaling on
+     python main.py -m train -r True
+
+     # Evaluate in zero-shot mode with normalization
+     python main.py -m evaluate -z True -n True
+     ```
+
+2. **`data_loader.py`**  
+   - Loads and processes time-series data.
+
+3. **`lag_llama_trainer.py`**  
+   - Wraps the training logic for Lag-Llama. Also references the code under `lag_llama/`.
+
+4. **`callbacks_handler.py`**, **`wandb_handler.py`**  
+   - Manages callbacks and Weights & Biases logging.
+
+5. **`deterioration_probability_calculator.py`**, **`forecast_cost_estimator.py`**  
+   - Modules specific to our predictive maintenance setting.  
+   - They compute probabilities of deterioration/failure and the associated cost metrics.
+
+6. **`constants.py`**  
+   - Centralized configuration for file paths, hyperparameters, default cost values, etc.
+
+## Deterioration Dataset Generator
+
+`deterioration_dataset_generator.py` is a standalone script for creating synthetic deterioration data.  
+It simulates a univariate time series that reflects progressive wear-and-tear, making it ideal for testing and benchmarking predictive maintenance strategies.
+
+### Usage
+
+You can run it directly:
+```bash
+python deterioration_dataset_generator.py
+```
+You can change given parameters in the class. By default, the script generates and saves two Parquet files (long and wide formats) in:
+```bash
+datasets/deterioration/
+```
+
+## Installation and Setup
+
+1. **Clone or download** this fork:
+   ```bash
+   git clone https://github.com/BerkayKozan/lag-llama.git
+   cd lag-llama
+   ```
+2. **Create a virtual environment**:
+   ```bash
+      python3 -m venv .venv
+      source .venv/bin/activate  # On macOS/Linux
+      # .venv\Scripts\activate   # On Windows
+   ```
+3. **Install Dependencies**:
+   ```bash
+      pip install --upgrade pip setuptools wheel
+      pip install -r requirements.txt
+   ```
+4. **Run**: 
+   ```bash
+   python main.py -m train
+   # or
+   python main.py -m evaluate
+   ```
+   • Refer to Usage above for more argument options.
+
+## Best Practices of Our Work (From Original + Our PdM Work):
+1. **Context Length**:
+      - For our dataset, larger context lengths (i.e. 64, 128) are preferred, for better results.
+2. **Learning Rate**:
+      - For our dataset, smaller learning rates (i.e. $10^{-5}$) works best, resulting in smaller validation loss.
+4. **RoPE Scaling**:
+      - If you need a context length beyond the model’s training size, use --rope_scaling (i.e., -r True).
+5. **Normalization**:
+      - By default, -n True is enabled. If your data is already scaled or you prefer raw values, disable it with -n False.
+7. **Fine-tuning vs zero-shot**:
+      - Zero-shot can be fast to test on the new data. Since we can generate our data, fine-tuning boosts the performance, increasing accuracy, and resulting in a better metric score, if used on a correct configurations and hyperparameter tuning.
+8. **Early Stopping (training)**:
+      - By default it is enabled. This option lets us save time, when validation loss does not decrease in several epochs.
+9. **PdM-Specific Metric**:
+      - We incorporate a cost-based metric to repair times for each component, determined based on the forecasts from our model. See our code in forecast_cost_estimator.py for details.
+   
+____
+## Back to Original Lag Llama Repo:
+
 <b>Updates</b>:
 * **27-June-2024**: Fixed critical issues in the kv_cache implementation, improving forecast accuracy. The fixes include: resetting the self.y_cache flag globally, using causal attention correctly during kv_cache initialization, and adjusting rotary embeddings post-concatenation. Contribution by [@KelianM](https://github.com/KelianM).
 * **16-Apr-2024**: Released pretraining and finetuning scripts to replicate the experiments in the paper. See [Reproducing Experiments in the Paper](https://github.com/time-series-foundation-models/lag-llama?tab=readme-ov-file#reproducing-experiments-in-the-paper) for details.
